@@ -18,6 +18,7 @@ function init() {
   document.getElementById('btn-process').addEventListener('click', handleProcess);
   document.getElementById('btn-reset').addEventListener('click', resetForm);
   document.getElementById('btn-download-again').addEventListener('click', downloadAgain);
+  document.getElementById('btn-download-log').addEventListener('click', downloadLog);
   updateProcessButton();
 }
 // app.js e carregado dinamicamente pelo modulo PDF.js, DOMContentLoaded pode ja ter disparado
@@ -198,6 +199,14 @@ function showReport(data) {
 /* -- Download ----------------------------------------------------- */
 function autoDownload(data) { triggerDownload(data.xlsx_base64, data.report.output_filename || 'ImportPlan_atualizado.xlsx'); }
 function downloadAgain()    { if (window._lastResult) autoDownload(window._lastResult); }
+function downloadLog() {
+  var p=document.getElementById('proc-log-body'); if (!p) return;
+  var t=p.innerText||p.textContent;
+  var ts=new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+  var b=new Blob([t],{type:'text/plain;charset=utf-8'});
+  var a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:'proc_'+ts+'.txt'});
+  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},5000);
+}
 function triggerDownload(b64, name) {
   const bin = atob(b64); const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
