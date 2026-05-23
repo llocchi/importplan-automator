@@ -1,0 +1,174 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>tuut — ImportPlan Automator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- PDF.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs" type="module" id="pdfjs-lib"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="app-header__logo">tuut</div>
+    <span class="app-header__title">ImportPlan Automator</span>
+    <span class="app-header__subtitle">Tuut &middot; Uso interno</span>
+  </header>
+
+  <!-- MAIN -->
+  <main class="app-main">
+    <div class="app-card">
+
+      <!-- Card Header -->
+      <div class="app-card__header">
+        <h1 class="app-card__title">Atualizar No. Seq.</h1>
+        <p class="app-card__desc">
+          Selecione o cat&aacute;logo PDF e a planilha ImportPlan. O sistema extrai os sequenciais
+          do cat&aacute;logo e preenche a coluna <strong>No. Seq.</strong> automaticamente.
+        </p>
+      </div>
+
+      <!-- Card Body -->
+      <div class="app-card__body">
+
+        <!-- Upload Grid -->
+        <div class="upload-grid">
+
+          <!-- PDF Zone -->
+          <div class="upload-zone" id="zone-pdf" role="button" aria-label="Selecionar cat&aacute;logo PDF">
+            <input type="file" id="input-pdf" accept=".pdf" aria-label="Arquivo PDF">
+            <span class="upload-zone__icon" id="icon-pdf">&#128196;</span>
+            <span class="upload-zone__label">Cat&aacute;logo PDF</span>
+            <span class="upload-zone__hint" id="hint-pdf">Clique ou arraste o PDF aqui<br><small>Qualquer tamanho &mdash; processado no browser</small></span>
+            <span class="upload-zone__filename hidden" id="filename-pdf"></span>
+            <span class="upload-zone__error-msg hidden" id="error-pdf"></span>
+          </div>
+
+          <!-- XLSX Zone -->
+          <div class="upload-zone" id="zone-xlsx" role="button" aria-label="Selecionar planilha XLSX">
+            <input type="file" id="input-xlsx" accept=".xlsx,.xls" aria-label="Arquivo XLSX">
+            <span class="upload-zone__icon" id="icon-xlsx">&#128202;</span>
+            <span class="upload-zone__label">Planilha ImportPlan</span>
+            <span class="upload-zone__hint" id="hint-xlsx">Clique ou arraste o XLSX aqui<br><small>M&aacute;x. 50 MB</small></span>
+            <span class="upload-zone__filename hidden" id="filename-xlsx"></span>
+            <span class="upload-zone__error-msg hidden" id="error-xlsx"></span>
+          </div>
+
+        </div><!-- /upload-grid -->
+
+        <!-- Process Button -->
+        <button class="btn btn--primary" id="btn-process" disabled>
+          <span id="btn-icon">&#9889;</span>
+          <span id="btn-text">Processar</span>
+        </button>
+
+        <!-- Status: Processing -->
+        <div class="status-msg status-msg--info hidden" id="status-processing" role="status">
+          <span class="status-msg__icon">&#9881;</span>
+          <div class="status-msg__body">
+            <span class="status-msg__title">Processando...</span>
+            <span class="status-msg__text" id="progress-msg">Iniciando...</span>
+            <div class="progress-steps">
+              <span class="progress-step pending" id="step-1">1. Extraindo PDF</span>
+              <span class="progress-step pending" id="step-2">2. Lendo XLSX</span>
+              <span class="progress-step pending" id="step-3">3. Atualizando</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status: Cold Start -->
+        <div class="status-msg status-msg--info hidden" id="status-coldstart" role="status">
+          <span class="status-msg__icon">&#8987;</span>
+          <div class="status-msg__body">
+            <span class="status-msg__title">Aguardando o servidor...</span>
+            <span class="status-msg__text">O servidor est&aacute; inicializando (pode levar at&eacute; 30s na primeira vez). Por favor, aguarde.</span>
+          </div>
+        </div>
+
+        <!-- Status: Error -->
+        <div class="status-msg status-msg--error hidden" id="status-error" role="alert">
+          <span class="status-msg__icon">&#10060;</span>
+          <div class="status-msg__body">
+            <span class="status-msg__title">Erro no processamento</span>
+            <span class="status-msg__text">Ocorreu um erro. Tente novamente.</span>
+          </div>
+        </div>
+
+        <!-- Report -->
+        <div class="report hidden" id="report">
+          <div class="report__header">
+            <span class="report__title">Resultado</span>
+            <span class="report__badge">&#10003; Conclu&iacute;do</span>
+          </div>
+          <div class="report__stats">
+            <div class="report__stat">
+              <span class="report__stat-value report__stat-value--neutral" id="stat-total">0</span>
+              <span class="report__stat-label">Linhas</span>
+            </div>
+            <div class="report__stat">
+              <span class="report__stat-value report__stat-value--success" id="stat-updated">0</span>
+              <span class="report__stat-label">Atualizadas</span>
+            </div>
+            <div class="report__stat">
+              <span class="report__stat-value report__stat-value--warning" id="stat-missing">0</span>
+              <span class="report__stat-label">N&atilde;o encontradas</span>
+            </div>
+            <div class="report__stat">
+              <span class="report__stat-value report__stat-value--neutral" id="stat-triplas">0</span>
+              <span class="report__stat-label">Seq. no PDF</span>
+            </div>
+          </div>
+
+          <!-- Not found list -->
+          <div class="report__not-found hidden" id="report-not-found">
+            <span class="report__not-found-title">N&atilde;o encontradas</span>
+            <ul class="report__not-found-list" id="report-not-found-list"></ul>
+          </div>
+
+          <!-- Triplas sample -->
+          <div class="proc-log" id="triplas-debug" style="display:none">
+            <div class="proc-log__title"><span>&#128269;</span> Amostra sequenciais capturados do PDF</div>
+            <pre class="proc-log__body" id="triplas-sample-body"></pre>
+          </div>
+          <!-- Processing Log -->
+          <div class="proc-log">
+            <div class="proc-log__title">
+              <span>&#128221;</span> Log de processamento
+            </div>
+            <pre class="proc-log__body" id="proc-log-body"></pre>
+          </div>
+
+          <!-- Actions -->
+          <div class="report__actions">
+            <button class="btn btn--primary" id="btn-download-again">&#11015; Baixar novamente</button>
+            <button class="btn--secondary" id="btn-reset">Processar outro arquivo</button>
+          </div>
+        </div><!-- /report -->
+
+      </div><!-- /card-body -->
+    </div><!-- /app-card -->
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    tuut &middot; ImportPlan Automator &middot; Uso interno &middot; Sem login &middot; Sem armazenamento de dados
+  </footer>
+
+</div><!-- /app-shell -->
+
+<script type="module">
+  import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+  window.pdfjsLib = pdfjsLib;
+  // Load app after PDF.js is ready
+  const s = document.createElement('script');
+  s.src = 'app.js';
+  document.head.appendChild(s);
+</script>
+</body>
+</html>
