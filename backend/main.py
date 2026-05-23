@@ -1,11 +1,11 @@
-import os, time
+import os, time, logging
 from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 from pdf_extractor import extract_triplas
 from xlsx_updater import update_xlsx
-from logger_setup import get_logger
+from logger_setup import get_logger, LOG_DIR
 
 log = get_logger('tuut.api')
 app = FastAPI(title='Catalog Import Processor API', version='1.0.0')
@@ -89,4 +89,14 @@ async def process(req: ProcessRequest):
 
     log.info('CONCLUIDO: atualizadas=%d nao_encontradas=%d duracao=%ss',
              result['report']['updated'], len(result['report']['not_found']), duration)
+
+    # Flush handlers e lê app.log para retornar ao frontend
+    for h in logging.getLogger('tuut').handlers:
+        h.flush()
+    try:
+        log_path = LOG_DIR / 'app.log'
+        result['log_content'] = log_path.read_text(encoding='utf-8') if log_path.exists() else ''
+    except Exception:
+        result['log_content'] = ''
+
     return result

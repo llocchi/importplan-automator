@@ -193,19 +193,24 @@ function showReport(data) {
     '<span class="proc-log__line proc-log__line--label">Duracao backend </span><span class="proc-log__line proc-log__line--time">'  + (r.duration_seconds || '-') + 's</span>',
     '<span class="proc-log__line proc-log__line--sep">-----------------------------------------</span>'
   ].join('');
-  window._lastResult = data; window._outputName = r.output_filename;
+  window._lastResult = data; window._outputName = r.output_filename; window._lastLog = data.log_content || '';
 }
 
 /* -- Download ----------------------------------------------------- */
 function autoDownload(data) { triggerDownload(data.xlsx_base64, data.report.output_filename || 'ImportPlan_atualizado.xlsx'); }
 function downloadAgain()    { if (window._lastResult) autoDownload(window._lastResult); }
 function downloadLog() {
-  var p=document.getElementById('proc-log-body'); if (!p) return;
-  var t=p.innerText||p.textContent;
-  var ts=new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
-  var b=new Blob([t],{type:'text/plain;charset=utf-8'});
-  var a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:'proc_'+ts+'.txt'});
-  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},5000);
+  var t = window._lastLog;
+  if (!t) { alert('Log nao disponivel'); return; }
+  var ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+  var b = new Blob([t], {type: 'text/plain;charset=utf-8'});
+  var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'processamento_'+ts+'.log'});
+  a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+}
+  var ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+  var b = new Blob([t], {type: 'text/plain;charset=utf-8'});
+  var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'processamento_'+ts+'.log'});
+  a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
 }
 function triggerDownload(b64, name) {
   const bin = atob(b64); const bytes = new Uint8Array(bin.length);
@@ -243,7 +248,7 @@ function resetForm() {
   document.getElementById('btn-icon').textContent = '\u26a1';
   document.getElementById('btn-text').textContent = 'Processar';
   updateProcessButton();
-  window._lastResult = window._outputName = null;
+  window._lastResult = window._outputName = window._lastLog = null;
 }
 function formatBytes(b) { return b<1024 ? b+' B' : b<1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB'; }
 function fileToBase64(file) {
