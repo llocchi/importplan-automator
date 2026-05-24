@@ -26,11 +26,9 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     ws = wb.active
     log.info('XLSX: sheet=%s max_row=%d max_col=%d', ws.title, ws.max_row, ws.max_column)
 
-    # Cabecalho completo
     header = [_norm(ws.cell(1, c).value) for c in range(1, ws.max_column + 1)]
     log.info('XLSX cabecalho: %s', ' | '.join(f'C{i+1}={h}' for i, h in enumerate(header)))
 
-    # Detecta coluna de descricao pelo cabecalho
     desc_col_idx = None
     for idx, h in enumerate(header):
         hl = h.lower()
@@ -38,10 +36,9 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
             desc_col_idx = idx
             break
     if desc_col_idx is None and len(header) > 1:
-        desc_col_idx = 1  # fallback: segunda coluna
-    log.info('Coluna descricao: C%d=%s', (desc_col_idx or 0) + 1, header[desc_col_idx] if desc_col_idx is not None else 'nenhuma')
+        desc_col_idx = 1
 
-    # --- 1. Monta indice XLSX ---
+    # --- 1. Monta indice XLSX: (SIS, REF) -> lista de (row_num, seq_cell) ---
     xlsx_index: Dict[Tuple[str,str], list] = {}
     total_xlsx_linhas = 0
     for row in ws.iter_rows(min_row=2):
@@ -57,64 +54,36 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
             xlsx_index[key] = []
         xlsx_index[key].append((row[0].row, row[0]))
 
-    log.info('XLSX index: %d pares unicos | %d linhas com SIS+REF validos | %d no PDF',
-             len(xlsx_index), total_xlsx_linhas, len(triplas))
+    log.info('XLSX index: %d pares unicos | %d linhas | %d produtos no PDF', len(xlsx_index), total_xlsx_linhas, len(triplas))
 
-    # --- 2. Indice sis-only para fallback ---
-    triplas_by_sis: Dict[str, tuple] = {}
-    sis_to_ref_pdf: Dict[str, str] = {}
-    for (s, r), sq in triplas.items():
-        if s not in triplas_by_sis:
-            triplas_by_sis[s] = (sq, encontrados.get((s, r), '?'))
-            sis_to_ref_pdf[s] = r
-
-    # --- 3. Atualiza XLSX ---
+    # --- 2. Atualiza XLSX: correspondencia exata SIS+REF (sem fallback) ---
     updated = 0
     not_found_list = []
-    exact_count = 0
-    fallback_count = 0
     not_found_count = 0
 
     for (sis, ref), xlsx_rows in xlsx_index.items():
-        seq = None
-        pag = '?'
-        caminho = None
         if (sis, ref) in triplas:
             seq = triplas[(sis, ref)]
             pag = encontrados.get((sis, ref), '?')
-            caminho = 'exato'
-            exact_count += 1
-        elif sis in triplas_by_sis:
-            seq, pag = triplas_by_sis[sis]
-            caminho = 'fallback'
-            fallback_count += 1
-            ref_pdf = sis_to_ref_pdf.get(sis, '?')
-            log.warning('FALLBACK sis=%s ref_xlsx=%s ref_pdf=%s seq=%s pag=%s',
-                        sis, ref, ref_pdf, seq, pag)
-
-        if seq is not None:
             for (row_num, seq_cell) in xlsx_rows:
                 try:
                     seq_cell.value = int(seq)
                 except ValueError:
                     seq_cell.value = seq
                 updated += 1
-                log.info('UPDATE seq=%s sis=%s ref=%s pag=%s via=%s row=%d',
-                         seq, sis, ref, pag, caminho, row_num)
+                log.info('UPDATE seq=%s | sis=%s | ref=%s | pag=%s | row=%d', seq, sis, ref, pag, row_num)
         else:
             not_found_count += 1
             not_found_list.append({'sistema': sis, 'ref': ref, 'motivo': 'nao no PDF'})
-            log.error('NAO_ENCONTRADO sis=%s ref=%s', sis, ref)
+            log.warning('NAO_ENCONTRADO sis=%s | ref=%s', sis, ref)
 
-    log.info('XLSX FIM: pares_unicos=%d linhas_xlsx=%d pdf_produtos=%d exato=%d fallback=%d nao_encontrado=%d rows_atualizadas=%d',
-             len(xlsx_index), total_xlsx_linhas, len(triplas),
-             exact_count, fallback_count, not_found_count, updated)
+    log.info('XLSX FIM: linhas_xlsx=%d | pdf_produtos=%d | atualizadas=%d | nao_encontradas=%d', total_xlsx_linhas, len(triplas), updated, not_found_count)
 
     if updated == 0:
-        log.error('ZERO linhas atualizadas! Veja diagnostico acima.')
+        log.error('ZERO linhas atualizadas!')
 
-    # --- 4. Dump catalogo completo ---
-    log.info('CATALOGO INICIO: %d produtos listados abaixo', total_xlsx_linhas)
+    # --- 3. Dump catalogo completo (estado apos atualizacao) ---
+    log.info('CATALOGO INICIO: %d produtos', total_xlsx_linhas)
     for row in ws.iter_rows(min_row=2):
         if len(row) < 4:
             continue
@@ -126,8 +95,7 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
         desc_val = ''
         if desc_col_idx is not None and desc_col_idx < len(row):
             desc_val = _norm(row[desc_col_idx].value)
-        log.info('CATALOGO | seq=%-6s | sis=%-6s | ref=%-15s | desc=%s',
-                 seq_val, s, r, desc_val)
+        log.info('CATALOGO seq=%-6s | sis=%-6s | ref=%-15s | desc=%s', seq_val, s, r, desc_val)
     log.info('CATALOGO FIM: %d produtos', total_xlsx_linhas)
 
     base_name = original_name
