@@ -43,33 +43,39 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
 
     log.info('XLSX index: %d chaves unicas', len(xlsx_index))
 
-    # --- 2. Itera itens do PDF e preenche XLSX ---
+    # --- 2. Indice sis-only do PDF para fallback (REF PDF pode diferir do XLSX) ---
+    triplas_by_sis: Dict[str, tuple] = {}
+    for (s, r), sq in triplas.items():
+        if s not in triplas_by_sis:
+            triplas_by_sis[s] = (sq, encontrados.get((s, r), '?'))
+
+    # --- 3. Itera linhas do XLSX e preenche com seq do PDF ---
     updated = 0
     not_found_list = []
-    cnt_miss = 0
 
-    for (sis, ref), seq in triplas.items():
-        key = (sis, ref)
-        pag = encontrados.get(key, '?')
+    for (sis, ref), xlsx_rows in xlsx_index.items():
+        seq = None
+        pag = '?'
+        if (sis, ref) in triplas:
+            seq = triplas[(sis, ref)]
+            pag = encontrados.get((sis, ref), '?')
+        elif sis in triplas_by_sis:
+            seq, pag = triplas_by_sis[sis]
 
-        if key in xlsx_index:
-            for (row_num, seq_cell) in xlsx_index[key]:
+        if seq is not None:
+            for (row_num, seq_cell) in xlsx_rows:
                 try:
                     seq_cell.value = int(seq)
                 except ValueError:
                     seq_cell.value = seq
                 updated += 1
-                log.info('[FILL] pag=%-4s sys=%-8s ref=%-15s seq=%-4s -> row=%4d ATUALIZADO',
-                         pag, sis, ref, seq, row_num)
+                log.info('Atualizando sequencial %s sistema %s ref %s da pagina %s',
+                         seq, sis, ref, pag)
         else:
-            cnt_miss += 1
-            not_found_list.append({'sistema': sis, 'ref': ref, 'motivo': 'nao no XLSX'})
-            log.info('[MISS] pag=%-4s sys=%-8s ref=%-15s seq=%-4s -> NAO ENCONTRADO no XLSX',
-                     pag, sis, ref, seq)
+            not_found_list.append({'sistema': sis, 'ref': ref, 'motivo': 'nao no PDF'})
 
-    total_pdf = len(triplas)
-    log.info('UPDATE: pdf_items=%d | atualizados=%d | nao_enc=%d',
-             total_pdf, updated, cnt_miss)
+    log.info('Processamento concluido: %d atualizados, %d nao encontrados',
+             updated, len(not_found_list))
 
     if updated == 0:
         log.error('ZERO linhas atualizadas! Veja diagnostico acima.')

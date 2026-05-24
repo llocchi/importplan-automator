@@ -1,7 +1,7 @@
 import re
 from typing import List, Dict, Tuple
 
-PATTERN_PRODUTO = re.compile(r'(\d{4,6})\s*\|\s*([A-Z][A-Z0-9-]{2,15})')
+PATTERN_PRODUTO = re.compile(r'(\d{4,6})\s*\|\s*([A-Z][A-Z0-9-]{2,15}|\d{1,3}[A-Z][A-Z0-9-]{0,12})')
 PATTERN_INN     = re.compile(r'Inn\.|Mas\.|M[uU]lt\.', re.IGNORECASE)
 PATTERN_SEQ     = re.compile(r'^\s*(\d{1,4})\s*$')
 
@@ -18,6 +18,12 @@ def extract_triplas(pages: List[str]) -> Dict:
     for page_num, page_text in enumerate(pages, start=1):
         lines = page_text.split('\n')
         n = len(lines)
+        # Coleta todos os codigos SISTEMA da pagina para evitar falso positivo
+        page_sistemas_set = set()
+        for ln in lines:
+            pm = PATTERN_PRODUTO.search(ln)
+            if pm:
+                page_sistemas_set.add(pm.group(1).strip())
         page_prod = 0
         page_seqs = 0
         i = 0
@@ -42,8 +48,10 @@ def extract_triplas(pages: List[str]) -> Dict:
                         for k in range(j, min(j + 13, n)):
                             sm = PATTERN_SEQ.match(lines[k])
                             if sm:
-                                seq_found = sm.group(1).strip()
-                                break
+                                candidate = sm.group(1).strip()
+                                if candidate not in page_sistemas_set:
+                                    seq_found = candidate
+                                    break
                         break
 
                 # --- fallback: busca backward a partir da linha do produto ---
@@ -53,7 +61,9 @@ def extract_triplas(pages: List[str]) -> Dict:
                             break   # chegou no produto anterior, para
                         sm = PATTERN_SEQ.match(lines[bk])
                         if sm:
-                            seq_found = sm.group(1).strip()
+                            candidate = sm.group(1).strip()
+                            if candidate not in page_sistemas_set:
+                                seq_found = candidate
                             break
 
                 if inn_line >= 0 and seq_found is not None:

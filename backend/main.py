@@ -53,8 +53,8 @@ async def process(req: ProcessRequest):
     if payload_size > MAX_BYTES:
         raise HTTPException(413, 'Payload excede 60 MB')
 
-    log.info('REQUEST: pdf=%s xlsx=%s paginas=%d payload_kb=%d',
-             req.pdf_name, req.xlsx_name, len(req.pdf_pages), payload_size // 1024)
+    log.info('Inicio do processamento: pdf=%s xlsx=%s', req.pdf_name, req.xlsx_name)
+    log.info('Lendo o PDF: %d paginas', len(req.pdf_pages))
 
     start = time.time()
     try:
@@ -62,10 +62,9 @@ async def process(req: ProcessRequest):
         triplas    = extract_result['triplas']
         encontrados = extract_result.get('encontrados', set())
         diag_samples = extract_result.get('diag', [])
-        print(f'[API] TRIPLAS extraidas: {len(triplas)}')
+        log.info('%d produtos encontrados no PDF', len(triplas))
 
         if not triplas:
-            print(f'[API] ERRO: nenhum sequencial em {len(req.pdf_pages)} paginas')
             raise HTTPException(422, 'Nenhum sequencial encontrado no PDF. Verifique se o catalogo contem texto extraivel e o formato SISTEMA | REF.')
 
         result = update_xlsx(req.xlsx_base64, triplas, encontrados, req.xlsx_name)
