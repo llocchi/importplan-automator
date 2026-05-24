@@ -1,4 +1,4 @@
-﻿import base64, io
+import base64, io
 from datetime import datetime
 from typing import Dict, Tuple
 import openpyxl
@@ -98,21 +98,6 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     if updated == 0:
         log.error('ZERO linhas atualizadas!')
 
-    # --- 3. Dump catalogo completo ---
-    log.info('CATALOGO INICIO: %d produtos', total_xlsx_linhas)
-    for row in ws.iter_rows(min_row=2):
-        if len(row) < 4:
-            continue
-        s = _norm(row[2].value)
-        r = _norm(row[3].value)
-        if not s or not r or s in ('None', 'SISTEMA') or r in ('None', 'REF.'):
-            continue
-        seq_val = _norm(row[0].value)
-        desc_val = ''
-        if desc_col_idx is not None and desc_col_idx < len(row):
-            desc_val = _norm(row[desc_col_idx].value)
-        log.info('CATALOGO seq=%-6s | sis=%-6s | ref=%-15s | desc=%s', seq_val, s, r, desc_val)
-    log.info('CATALOGO FIM: %d produtos', total_xlsx_linhas)
 
     base_name = original_name
     for ext in ('.xlsx', '.xls', '.XLSX', '.XLS'):
