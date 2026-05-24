@@ -207,11 +207,6 @@ function downloadLog() {
   var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'processamento_'+ts+'.log'});
   a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
 }
-  var ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
-  var b = new Blob([t], {type: 'text/plain;charset=utf-8'});
-  var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'processamento_'+ts+'.log'});
-  a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
-}
 function triggerDownload(b64, name) {
   const bin = atob(b64); const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
