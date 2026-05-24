@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -162,13 +162,16 @@
 
 </div><!-- /app-shell -->
 
+<script>window.__API_URL__ = 'http://localhost:8000'; console.log('[TUUT] API_URL:', window.__API_URL__);</script><!-- LOCAL TEST: remover antes do deploy -->
+
+
 <script type="module">
   import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs';
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
   window.pdfjsLib = pdfjsLib;
   // Load app after PDF.js is ready
   const s = document.createElement('script');
-  s.src = 'app.js';
+  s.src = 'app.js?v=' + Date.now();
   document.head.appendChild(s);
 </script>
 </body>

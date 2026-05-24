@@ -1,4 +1,4 @@
-import os, time, logging
+﻿import os, time, logging
 from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,7 +62,7 @@ async def process(req: ProcessRequest):
         triplas    = extract_result['triplas']
         encontrados = extract_result.get('encontrados', set())
         diag_samples = extract_result.get('diag', [])
-        log.info('%d produtos encontrados no PDF', len(triplas))
+        log.info('PDF RESUMO: unicos=%d | com_seq=%d | sem_seq=%d', len(encontrados), len(triplas), len(encontrados) - len(triplas))
 
         if not triplas:
             raise HTTPException(422, 'Nenhum sequencial encontrado no PDF. Verifique se o catalogo contem texto extraivel e o formato SISTEMA | REF.')

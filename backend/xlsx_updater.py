@@ -56,8 +56,9 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
 
     log.info('XLSX index: %d pares unicos | %d linhas | %d produtos no PDF', len(xlsx_index), total_xlsx_linhas, len(triplas))
 
-    # --- 2. Atualiza XLSX: correspondencia exata SIS+REF (sem fallback) ---
+    # --- 2. Atualiza XLSX: correspondencia exata SIS+REF ---
     updated = 0
+    update_entries = []
     not_found_list = []
     not_found_count = 0
 
@@ -71,18 +72,24 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
                 except ValueError:
                     seq_cell.value = seq
                 updated += 1
-                log.info('UPDATE seq=%s | sis=%s | ref=%s | pag=%s | row=%d', seq, sis, ref, pag, row_num)
+                seq_sort = int(seq) if seq.isdigit() else 99999
+                update_entries.append((seq_sort, seq, sis, ref, pag, row_num))
         else:
             not_found_count += 1
             not_found_list.append({'sistema': sis, 'ref': ref, 'motivo': 'nao no PDF'})
             log.warning('NAO_ENCONTRADO sis=%s | ref=%s', sis, ref)
+
+    # Log em ordem crescente de sequencial
+    update_entries.sort(key=lambda x: x[0])
+    for _, seq, sis, ref, pag, row_num in update_entries:
+        log.info('UPDATE seq=%s | sis=%s | ref=%s | pag=%s | row=%d', seq, sis, ref, pag, row_num)
 
     log.info('XLSX FIM: linhas_xlsx=%d | pdf_produtos=%d | atualizadas=%d | nao_encontradas=%d', total_xlsx_linhas, len(triplas), updated, not_found_count)
 
     if updated == 0:
         log.error('ZERO linhas atualizadas!')
 
-    # --- 3. Dump catalogo completo (estado apos atualizacao) ---
+    # --- 3. Dump catalogo completo ---
     log.info('CATALOGO INICIO: %d produtos', total_xlsx_linhas)
     for row in ws.iter_rows(min_row=2):
         if len(row) < 4:
