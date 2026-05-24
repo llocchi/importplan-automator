@@ -27,47 +27,49 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     ws = wb.active
     log.info('XLSX: sheet=%s linhas=%d colunas=%d', ws.title, ws.max_row, ws.max_column)
 
-    updated = 0
-    not_found = []
-    total_rows = 0
-    cnt_nseq = 0
-    cnt_miss = 0
-
+    # --- 1. Monta indice XLSX: (SIS, REF) -> lista de (row_num, seq_cell) ---
+    xlsx_index: Dict[Tuple[str,str], list] = {}
     for row in ws.iter_rows(min_row=2):
         if len(row) < 4:
             continue
-        seq_cell = row[0]
         s = _norm(row[2].value)
         r = _norm(row[3].value)
         if not s or not r or s in ('None', 'SISTEMA') or r in ('None', 'REF.'):
             continue
-        total_rows += 1
         key = (s, r)
-        row_num = seq_cell.row
+        if key not in xlsx_index:
+            xlsx_index[key] = []
+        xlsx_index[key].append((row[0].row, row[0]))
 
-        if key in triplas:
-            seq = triplas[key]
-            pag = encontrados.get(key, '?')
-            try:
-                seq_cell.value = int(seq)
-            except ValueError:
-                seq_cell.value = seq
-            updated += 1
-            log.debug('[OK  ] row=%4d sys=%-8s ref=%-15s seq=%-4s pag=%s', row_num, s, r, seq, pag)
+    log.info('XLSX index: %d chaves unicas', len(xlsx_index))
 
-        elif key in encontrados:
-            pag_n = encontrados.get(key, '?')
-            cnt_nseq += 1
-            not_found.append({'sistema': s, 'ref': r, 'motivo': 'Inn sem seq'})
-            log.info('[NSEQ] row=%4d sys=%-8s ref=%-15s (Inn sem seq)  pag=%s', row_num, s, r, pag_n)
+    # --- 2. Itera itens do PDF e preenche XLSX ---
+    updated = 0
+    not_found_list = []
+    cnt_miss = 0
 
+    for (sis, ref), seq in triplas.items():
+        key = (sis, ref)
+        pag = encontrados.get(key, '?')
+
+        if key in xlsx_index:
+            for (row_num, seq_cell) in xlsx_index[key]:
+                try:
+                    seq_cell.value = int(seq)
+                except ValueError:
+                    seq_cell.value = seq
+                updated += 1
+                log.info('[FILL] pag=%-4s sys=%-8s ref=%-15s seq=%-4s -> row=%4d ATUALIZADO',
+                         pag, sis, ref, seq, row_num)
         else:
             cnt_miss += 1
-            not_found.append({'sistema': s, 'ref': r, 'motivo': 'nao no PDF'})
-            log.info('[MISS] row=%4d sys=%-8s ref=%-15s (nao no PDF)', row_num, s, r)
+            not_found_list.append({'sistema': sis, 'ref': ref, 'motivo': 'nao no XLSX'})
+            log.info('[MISS] pag=%-4s sys=%-8s ref=%-15s seq=%-4s -> NAO ENCONTRADO no XLSX',
+                     pag, sis, ref, seq)
 
-    log.info('UPDATE: total=%d | atualizadas=%d | nao_enc=%d (NSEQ=%d MISS=%d)',
-             total_rows, updated, len(not_found), cnt_nseq, cnt_miss)
+    total_pdf = len(triplas)
+    log.info('UPDATE: pdf_items=%d | atualizados=%d | nao_enc=%d',
+             total_pdf, updated, cnt_miss)
 
     if updated == 0:
         log.error('ZERO linhas atualizadas! Veja diagnostico acima.')
@@ -83,9 +85,9 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     return {
         'xlsx_base64': b64,
         'report': {
-            'total_rows': total_rows,
+            'total_rows': len(xlsx_index),
             'updated': updated,
-            'not_found': not_found,
+            'not_found': not_found_list,
             'output_filename': output_filename,
             'processed_at': datetime.now().isoformat(),
         }
