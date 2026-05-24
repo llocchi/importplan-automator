@@ -1,4 +1,4 @@
-
+﻿
     /* ══════════════════════════════════════════
        DESIGN SYSTEM — TOKENS
     ══════════════════════════════════════════ */
@@ -204,6 +204,11 @@
                   background var(--transition-fast);
       position: relative;
       background: var(--color-bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 160px;
     }
 
     .upload-zone:hover:not(.upload-zone--disabled) {
@@ -277,6 +282,7 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 100%;
+      width: 100%;
     }
 
     .upload-zone__error-msg {
