@@ -23,14 +23,25 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
         raise ValueError('xlsx_base64 invalido')
 
     wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
-    log.info('Sheets no XLSX: %s | Ativa: %s', wb.sheetnames, wb.active.title)
     ws = wb.active
     log.info('XLSX: sheet=%s max_row=%d max_col=%d', ws.title, ws.max_row, ws.max_column)
 
-    header = [_norm(ws.cell(1, c).value) for c in range(1, min(7, ws.max_column + 1))]
-    log.info('XLSX cabecalho primeiras colunas: %s', header)
+    # Cabecalho completo
+    header = [_norm(ws.cell(1, c).value) for c in range(1, ws.max_column + 1)]
+    log.info('XLSX cabecalho: %s', ' | '.join(f'C{i+1}={h}' for i, h in enumerate(header)))
 
-    # --- 1. Monta indice XLSX: (SIS, REF) -> lista de (row_num, seq_cell) ---
+    # Detecta coluna de descricao pelo cabecalho
+    desc_col_idx = None
+    for idx, h in enumerate(header):
+        hl = h.lower()
+        if any(kw in hl for kw in ('desc', 'produto', 'nome', 'product', 'item', 'designa')):
+            desc_col_idx = idx
+            break
+    if desc_col_idx is None and len(header) > 1:
+        desc_col_idx = 1  # fallback: segunda coluna
+    log.info('Coluna descricao: C%d=%s', (desc_col_idx or 0) + 1, header[desc_col_idx] if desc_col_idx is not None else 'nenhuma')
+
+    # --- 1. Monta indice XLSX ---
     xlsx_index: Dict[Tuple[str,str], list] = {}
     total_xlsx_linhas = 0
     for row in ws.iter_rows(min_row=2):
@@ -49,7 +60,7 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     log.info('XLSX index: %d pares unicos | %d linhas com SIS+REF validos | %d no PDF',
              len(xlsx_index), total_xlsx_linhas, len(triplas))
 
-    # --- 2. Indice sis-only do PDF para fallback ---
+    # --- 2. Indice sis-only para fallback ---
     triplas_by_sis: Dict[str, tuple] = {}
     sis_to_ref_pdf: Dict[str, str] = {}
     for (s, r), sq in triplas.items():
@@ -57,7 +68,7 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
             triplas_by_sis[s] = (sq, encontrados.get((s, r), '?'))
             sis_to_ref_pdf[s] = r
 
-    # --- 3. Itera linhas do XLSX e preenche com seq do PDF ---
+    # --- 3. Atualiza XLSX ---
     updated = 0
     not_found_list = []
     exact_count = 0
@@ -101,6 +112,23 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
 
     if updated == 0:
         log.error('ZERO linhas atualizadas! Veja diagnostico acima.')
+
+    # --- 4. Dump catalogo completo ---
+    log.info('CATALOGO INICIO: %d produtos listados abaixo', total_xlsx_linhas)
+    for row in ws.iter_rows(min_row=2):
+        if len(row) < 4:
+            continue
+        s = _norm(row[2].value)
+        r = _norm(row[3].value)
+        if not s or not r or s in ('None', 'SISTEMA') or r in ('None', 'REF.'):
+            continue
+        seq_val = _norm(row[0].value)
+        desc_val = ''
+        if desc_col_idx is not None and desc_col_idx < len(row):
+            desc_val = _norm(row[desc_col_idx].value)
+        log.info('CATALOGO | seq=%-6s | sis=%-6s | ref=%-15s | desc=%s',
+                 seq_val, s, r, desc_val)
+    log.info('CATALOGO FIM: %d produtos', total_xlsx_linhas)
 
     base_name = original_name
     for ext in ('.xlsx', '.xls', '.XLSX', '.XLS'):
