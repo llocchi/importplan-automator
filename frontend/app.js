@@ -1,4 +1,4 @@
-/* =================================================================
+﻿/* =================================================================
    app.js - Catalog Import Processor | Tuut ImportPlan Automator
    ================================================================= */
 
@@ -19,6 +19,7 @@ function init() {
   document.getElementById('btn-reset').addEventListener('click', resetForm);
   document.getElementById('btn-download-again').addEventListener('click', downloadAgain);
   document.getElementById('btn-download-log').addEventListener('click', downloadLog);
+  document.getElementById('btn-download-missing').addEventListener('click', downloadMissing);
   updateProcessButton();
 }
 // app.js e carregado dinamicamente pelo modulo PDF.js, DOMContentLoaded pode ja ter disparado
@@ -148,6 +149,8 @@ function showReport(data) {
   document.getElementById('stat-total').textContent   = r.total_rows || 0;
   document.getElementById('stat-updated').textContent = r.updated    || 0;
   document.getElementById('stat-missing').textContent = (r.not_found || []).length;
+  const btnMissing = document.getElementById('btn-download-missing');
+  if (btnMissing) btnMissing.classList.toggle('hidden', !r.not_found || r.not_found.length === 0);
   const triplasEl = document.getElementById('stat-triplas');
   if (triplasEl) triplasEl.textContent = r.triplas_found || 0;
 
@@ -206,6 +209,26 @@ function downloadLog() {
   var b = new Blob([t], {type: 'text/plain;charset=utf-8'});
   var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'processamento_'+ts+'.log'});
   a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+}
+function downloadMissing() {
+  var r = window._lastResult && window._lastResult.report;
+  if (!r || !r.not_found || r.not_found.length === 0) { alert('Nenhum item nao processado.'); return; }
+  var ts  = new Date().toLocaleString('pt-BR');
+  var tss = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+  var lines = [
+    'Nao Processados - ImportPlan Automator',
+    'Gerado em: ' + ts,
+    'Total: ' + r.not_found.length,
+    '',
+    'SISTEMA\tREF\tSEQUENCIAL\tPAGINA'
+  ];
+  r.not_found.forEach(function(item) {
+    lines.push(item.sistema + '\t' + item.ref + '\t\t');
+  });
+  var b = new Blob([lines.join('\r\n')], {type: 'text/plain;charset=utf-8'});
+  var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'nao_processados_' + tss + '.txt'});
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
 }
 function triggerDownload(b64, name) {
   const bin = atob(b64); const bytes = new Uint8Array(bin.length);
