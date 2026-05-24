@@ -1,4 +1,4 @@
-import base64, io
+﻿import base64, io
 from datetime import datetime
 from typing import Dict, Tuple
 import openpyxl
@@ -84,7 +84,16 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     for _, seq, sis, ref, pag, row_num in update_entries:
         log.info('UPDATE seq=%s | sis=%s | ref=%s | pag=%s | row=%d', seq, sis, ref, pag, row_num)
 
-    log.info('XLSX FIM: linhas_xlsx=%d | pdf_produtos=%d | atualizadas=%d | nao_encontradas=%d', total_xlsx_linhas, len(triplas), updated, not_found_count)
+    # Produtos no PDF que nao estao na planilha
+    catalog_only = [
+        {'sistema': sis, 'ref': ref, 'seq': triplas[(sis, ref)], 'pagina': str(encontrados.get((sis, ref), '?'))}
+        for (sis, ref) in triplas
+        if (sis, ref) not in xlsx_index
+    ]
+    for item in catalog_only:
+        log.warning('CATALOGO_SEM_PLANILHA sis=%s | ref=%s | seq=%s | pag=%s', item['sistema'], item['ref'], item['seq'], item['pagina'])
+
+    log.info('XLSX FIM: linhas_xlsx=%d | pdf_produtos=%d | atualizadas=%d | nao_encontradas=%d | catalogo_sem_planilha=%d', total_xlsx_linhas, len(triplas), updated, not_found_count, len(catalog_only))
 
     if updated == 0:
         log.error('ZERO linhas atualizadas!')
@@ -119,6 +128,7 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
             'total_rows': total_xlsx_linhas,
             'updated': updated,
             'not_found': not_found_list,
+            'catalog_only': catalog_only,
             'output_filename': output_filename,
             'processed_at': datetime.now().isoformat(),
         }

@@ -148,9 +148,9 @@ function showReport(data) {
   document.getElementById('report').classList.remove('hidden');
   document.getElementById('stat-total').textContent   = r.total_rows || 0;
   document.getElementById('stat-updated').textContent = r.updated    || 0;
-  document.getElementById('stat-missing').textContent = (r.not_found || []).length;
+  document.getElementById('stat-missing').textContent = (r.catalog_only || []).length;
   const btnMissing = document.getElementById('btn-download-missing');
-  if (btnMissing) btnMissing.classList.toggle('hidden', !r.not_found || r.not_found.length === 0);
+  if (btnMissing) btnMissing.classList.toggle('hidden', !r.catalog_only || r.catalog_only.length === 0);
   const triplasEl = document.getElementById('stat-triplas');
   if (triplasEl) triplasEl.textContent = r.triplas_found || 0;
 
@@ -171,12 +171,12 @@ function showReport(data) {
   const nfList = document.getElementById('report-not-found-list');
   const nfSect = document.getElementById('report-not-found');
   nfList.innerHTML = '';
-  if (r.not_found && r.not_found.length > 0) {
+  if (r.catalog_only && r.catalog_only.length > 0) {
     nfSect.classList.remove('hidden');
-    r.not_found.forEach(item => {
+    r.catalog_only.forEach(item => {
       const li = document.createElement('li');
       li.className = 'report__not-found-item';
-      li.textContent = item.sistema + ' | ' + item.ref;
+      li.textContent = item.sistema + ' | ' + item.ref + '  \u2192  seq ' + item.seq + '  (p\u00e1g. ' + item.pagina + ')';
       nfList.appendChild(li);
     });
   } else { nfSect.classList.add('hidden'); }
@@ -212,18 +212,18 @@ function downloadLog() {
 }
 function downloadMissing() {
   var r = window._lastResult && window._lastResult.report;
-  if (!r || !r.not_found || r.not_found.length === 0) { alert('Nenhum item nao processado.'); return; }
+  if (!r || !r.catalog_only || r.catalog_only.length === 0) { alert('Nenhum item no catalogo sem planilha.'); return; }
   var ts  = new Date().toLocaleString('pt-BR');
   var tss = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
   var lines = [
-    'Nao Processados - ImportPlan Automator',
+    'No catalogo, fora da planilha - ImportPlan Automator',
     'Gerado em: ' + ts,
-    'Total: ' + r.not_found.length,
+    'Total: ' + r.catalog_only.length,
     '',
     'SISTEMA\tREF\tSEQUENCIAL\tPAGINA'
   ];
-  r.not_found.forEach(function(item) {
-    lines.push(item.sistema + '\t' + item.ref + '\t\t');
+  r.catalog_only.forEach(function(item) {
+    lines.push(item.sistema + '\t' + item.ref + '\t' + item.seq + '\t' + item.pagina);
   });
   var b = new Blob([lines.join('\r\n')], {type: 'text/plain;charset=utf-8'});
   var a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(b), download: 'nao_processados_' + tss + '.txt'});
