@@ -25,10 +25,14 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
     log.info('Sheets no XLSX: %s | Ativa: %s', wb.sheetnames, wb.active.title)
     ws = wb.active
-    log.info('XLSX: sheet=%s linhas=%d colunas=%d', ws.title, ws.max_row, ws.max_column)
+    log.info('XLSX: sheet=%s max_row=%d max_col=%d', ws.title, ws.max_row, ws.max_column)
+
+    header = [_norm(ws.cell(1, c).value) for c in range(1, min(7, ws.max_column + 1))]
+    log.info('XLSX cabecalho primeiras colunas: %s', header)
 
     # --- 1. Monta indice XLSX: (SIS, REF) -> lista de (row_num, seq_cell) ---
     xlsx_index: Dict[Tuple[str,str], list] = {}
+    total_xlsx_linhas = 0
     for row in ws.iter_rows(min_row=2):
         if len(row) < 4:
             continue
@@ -36,31 +40,46 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
         r = _norm(row[3].value)
         if not s or not r or s in ('None', 'SISTEMA') or r in ('None', 'REF.'):
             continue
+        total_xlsx_linhas += 1
         key = (s, r)
         if key not in xlsx_index:
             xlsx_index[key] = []
         xlsx_index[key].append((row[0].row, row[0]))
 
-    log.info('XLSX index: %d chaves unicas', len(xlsx_index))
+    log.info('XLSX index: %d pares unicos | %d linhas com SIS+REF validos | %d no PDF',
+             len(xlsx_index), total_xlsx_linhas, len(triplas))
 
-    # --- 2. Indice sis-only do PDF para fallback (REF PDF pode diferir do XLSX) ---
+    # --- 2. Indice sis-only do PDF para fallback ---
     triplas_by_sis: Dict[str, tuple] = {}
+    sis_to_ref_pdf: Dict[str, str] = {}
     for (s, r), sq in triplas.items():
         if s not in triplas_by_sis:
             triplas_by_sis[s] = (sq, encontrados.get((s, r), '?'))
+            sis_to_ref_pdf[s] = r
 
     # --- 3. Itera linhas do XLSX e preenche com seq do PDF ---
     updated = 0
     not_found_list = []
+    exact_count = 0
+    fallback_count = 0
+    not_found_count = 0
 
     for (sis, ref), xlsx_rows in xlsx_index.items():
         seq = None
         pag = '?'
+        caminho = None
         if (sis, ref) in triplas:
             seq = triplas[(sis, ref)]
             pag = encontrados.get((sis, ref), '?')
+            caminho = 'exato'
+            exact_count += 1
         elif sis in triplas_by_sis:
             seq, pag = triplas_by_sis[sis]
+            caminho = 'fallback'
+            fallback_count += 1
+            ref_pdf = sis_to_ref_pdf.get(sis, '?')
+            log.warning('FALLBACK sis=%s ref_xlsx=%s ref_pdf=%s seq=%s pag=%s',
+                        sis, ref, ref_pdf, seq, pag)
 
         if seq is not None:
             for (row_num, seq_cell) in xlsx_rows:
@@ -69,13 +88,16 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
                 except ValueError:
                     seq_cell.value = seq
                 updated += 1
-                log.info('Atualizando sequencial %s sistema %s ref %s da pagina %s',
-                         seq, sis, ref, pag)
+                log.info('UPDATE seq=%s sis=%s ref=%s pag=%s via=%s row=%d',
+                         seq, sis, ref, pag, caminho, row_num)
         else:
+            not_found_count += 1
             not_found_list.append({'sistema': sis, 'ref': ref, 'motivo': 'nao no PDF'})
+            log.error('NAO_ENCONTRADO sis=%s ref=%s', sis, ref)
 
-    log.info('Processamento concluido: %d atualizados, %d nao encontrados',
-             updated, len(not_found_list))
+    log.info('XLSX FIM: pares_unicos=%d linhas_xlsx=%d pdf_produtos=%d exato=%d fallback=%d nao_encontrado=%d rows_atualizadas=%d',
+             len(xlsx_index), total_xlsx_linhas, len(triplas),
+             exact_count, fallback_count, not_found_count, updated)
 
     if updated == 0:
         log.error('ZERO linhas atualizadas! Veja diagnostico acima.')
@@ -91,7 +113,7 @@ def update_xlsx(xlsx_base64: str, triplas: Dict[Tuple[str,str],str],
     return {
         'xlsx_base64': b64,
         'report': {
-            'total_rows': len(xlsx_index),
+            'total_rows': total_xlsx_linhas,
             'updated': updated,
             'not_found': not_found_list,
             'output_filename': output_filename,
